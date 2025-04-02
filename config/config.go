@@ -15,6 +15,9 @@ import (
 const (
 	TYPE_TIMESTAMP = "timestamp"
 	TYPE_DATETIME  = "datetime"
+
+	KUBE_SELECTOR_ERROR = "<error>"
+	KUBE_SELECTOR_NONE  = "<none>"
 )
 
 type (
@@ -25,8 +28,11 @@ type (
 	ConfigMetrics struct {
 		Metric   *MetricConfig               `yaml:"metric"`
 		Resource schema.GroupVersionResource `yaml:"resource"`
-		Selector *metav1.LabelSelector       `yaml:"selector"`
-		Filters  []string                    `yaml:"filters"`
+
+		Selector  *metav1.LabelSelector `yaml:"selector"`
+		_selector string
+
+		Filters  []string `yaml:"filters"`
 		_filters []*jsonpath.JSONPath
 	}
 
@@ -120,13 +126,25 @@ func (m *ConfigMetrics) Compile() error {
 		}
 	}
 
+	// selector
+	if m.Selector != nil {
+		selector := metav1.FormatLabelSelector(m.Selector)
+		if strings.EqualFold(selector, KUBE_SELECTOR_ERROR) {
+			return fmt.Errorf(`unable to compile Kubernetes selector for metric "%s"`, m.Metric.Name)
+		}
+
+		if !strings.EqualFold(selector, KUBE_SELECTOR_NONE) {
+			m._selector = selector
+		}
+	}
+
 	return nil
 }
 
 func (m *ConfigMetrics) KubeMetaListOptions() metav1.ListOptions {
 	opts := metav1.ListOptions{}
-	if m.Selector != nil {
-		opts.LabelSelector = metav1.FormatLabelSelector(m.Selector)
+	if m._selector != "" {
+		opts.LabelSelector = m._selector
 	}
 
 	return opts

@@ -50,9 +50,7 @@ metrics:
       resource: secrets
 
     # optional selector, if empty all resources will be processed
-    selector:
-      matchLabels:
-        app.kubernetes.io/managed-by: Helm
+    selector: {}
 
     # optional filters, must return a value, otherwise the resource is filtered
     filters:
