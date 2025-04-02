@@ -98,6 +98,10 @@ func initConfig(path string) {
 	if err := yaml.Unmarshal(configRaw, &exporterConfig); err != nil {
 		logger.Fatal(err)
 	}
+
+	if err := exporterConfig.Compile(); err != nil {
+		logger.Fatal(err)
+	}
 }
 
 func initKubeConnection() {

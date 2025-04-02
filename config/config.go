@@ -23,11 +23,11 @@ type (
 	}
 
 	ConfigMetrics struct {
-		Metric          *MetricConfig               `yaml:"metric"`
-		Resource        schema.GroupVersionResource `yaml:"resource"`
-		Selector        *metav1.LabelSelector       `yaml:"selector"`
-		Filters         []string                    `yaml:"filters"`
-		compiledFilters []*jsonpath.JSONPath
+		Metric   *MetricConfig               `yaml:"metric"`
+		Resource schema.GroupVersionResource `yaml:"resource"`
+		Selector *metav1.LabelSelector       `yaml:"selector"`
+		Filters  []string                    `yaml:"filters"`
+		_filters []*jsonpath.JSONPath
 	}
 
 	MetricConfig struct {
@@ -48,9 +48,9 @@ type (
 	}
 
 	MetricPathConfig struct {
-		Path     string `yaml:"jsonPath" json:"jsonPath"`
-		jsonPath *jsonpath.JSONPath
-		Type     *string `yaml:"type"`
+		Path  string `yaml:"jsonPath" json:"jsonPath"`
+		_path *jsonpath.JSONPath
+		Type  *string `yaml:"type"`
 	}
 
 	MetricJsonPath string
@@ -79,6 +79,50 @@ var (
 	}
 )
 
+func (m *Config) Compile() error {
+	for _, metric := range m.Metrics {
+		err := metric.Compile()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *ConfigMetrics) Compile() error {
+	// value path
+	if m.Metric.Value.MetricPathConfig != nil && m.Metric.Value.Path != "" {
+		if path, err := compileJsonPath(m.Metric.Value.Path); err == nil {
+			m.Metric.Value._path = path
+		} else {
+			return err
+		}
+	}
+
+	// labels path
+	for _, labelConfig := range m.Metric.Labels {
+		if labelConfig.MetricPathConfig != nil && labelConfig.Path != "" {
+			if path, err := compileJsonPath(labelConfig.Path); err == nil {
+				labelConfig._path = path
+			} else {
+				return err
+			}
+		}
+	}
+
+	// filters
+	for _, path := range m.Filters {
+		if path, err := compileJsonPath(path); err == nil {
+			m._filters = append(m._filters, path)
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *ConfigMetrics) KubeMetaListOptions() metav1.ListOptions {
 	opts := metav1.ListOptions{}
 	if m.Selector != nil {
@@ -93,19 +137,7 @@ func (m *ConfigMetrics) LabelSelectorString() string {
 }
 
 func (m *MetricPathConfig) JsonPath() (*jsonpath.JSONPath, error) {
-	if m.jsonPath == nil {
-		jsonPathString := strings.TrimSpace(m.Path)
-
-		path := jsonpath.New("jsonpath")
-		path.AllowMissingKeys(true)
-		if err := path.Parse(jsonPathString); err != nil {
-			return nil, err
-		}
-
-		m.jsonPath = path
-	}
-
-	return m.jsonPath, nil
+	return m._path, nil
 }
 
 func (m *MetricPathConfig) ParseLabel(val interface{}) (ret string) {
@@ -212,22 +244,7 @@ func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {
 		return true
 	}
 
-	// compile filters
-	if len(m.compiledFilters) == 0 {
-		for _, filter := range m.Filters {
-			jsonPathString := strings.TrimSpace(filter)
-
-			path := jsonpath.New("jsonpath")
-			path.AllowMissingKeys(true)
-			if err := path.Parse(jsonPathString); err != nil {
-				panic(err)
-			}
-
-			m.compiledFilters = append(m.compiledFilters, path)
-		}
-	}
-
-	for _, filter := range m.compiledFilters {
+	for _, filter := range m._filters {
 		if results, err := filter.FindResults(object.Object); err == nil {
 			if len(results) == 1 && len(results[0]) == 1 {
 				val := results[0][0].Interface()
@@ -248,4 +265,16 @@ func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {
 	}
 
 	return true
+}
+
+func compileJsonPath(path string) (*jsonpath.JSONPath, error) {
+	path = strings.TrimSpace(path)
+
+	ret := jsonpath.New("jsonpath")
+	ret.AllowMissingKeys(true)
+	if err := ret.Parse(path); err != nil {
+		return nil, fmt.Errorf(`unable to compile JSONpath "%s": %w`, path, err)
+	}
+
+	return ret, nil
 }
