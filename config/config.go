@@ -210,7 +210,6 @@ func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {
 		if results, err := filter.FindResults(object.Object); err == nil {
 			if len(results) == 1 && len(results[0]) == 1 {
 				val := results[0][0].Interface()
-
 				if val == nil {
 					// no value, object is filtered
 					return false
@@ -218,7 +217,7 @@ func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {
 
 				// convert to string and check if there is a value
 				value := fmt.Sprintf("%v", val)
-				if value != "" {
+				if value == "" {
 					return false
 				}
 			} else {
