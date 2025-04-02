@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/kubectl/pkg/cmd/get"
 )
 
 const (
@@ -283,10 +284,15 @@ func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {
 func compileJsonPath(path string) (*jsonpath.JSONPath, error) {
 	path = strings.TrimSpace(path)
 
+	jsonPathString, err := get.RelaxedJSONPathExpression(path)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to build JSONpath "%s": %w`, jsonPathString, err)
+	}
+
 	ret := jsonpath.New("jsonpath")
 	ret.AllowMissingKeys(true)
-	if err := ret.Parse(path); err != nil {
-		return nil, fmt.Errorf(`unable to compile JSONpath "%s": %w`, path, err)
+	if err := ret.Parse(jsonPathString); err != nil {
+		return nil, fmt.Errorf(`unable to parse JSONpath "%s": %w`, jsonPathString, err)
 	}
 
 	return ret, nil

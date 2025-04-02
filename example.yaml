@@ -12,8 +12,7 @@ metrics:
         value: 1
 
         # jsonPath for value extraction, must return only one value!
-        jsonPath: |-
-          {.metadata.annotations.expiry}
+        jsonPath: .metadata.annotations.expiry
 
         # value conversion:
         #   timestamp = try to parse value as datetime and convert to unix timestamp
@@ -28,19 +27,16 @@ metrics:
 
         # plain value using jsonPath
         resourceVersion:
-          jsonPath: |-
-            {$.metadata.resourceVersion}
+          jsonPath: .metadata.resourceVersion
 
         # plain value with timestamp conversion (value will be a unix timestamp as string)
         resourceVersionTS:
-          jsonPath: |-
-            {$.metadata.resourceVersion}
+          jsonPath: .metadata.resourceVersion
           type: timestamp
 
         # plain value with timestamp conversion (value will be a RFC3399 timestamp as string)
         resourceVersionDT:
-          jsonPath: |-
-            {$.metadata.resourceVersion}
+          jsonPath: .metadata.resourceVersion
           type: datetime
 
     # Kubernetes resource as GroupVersionResource
@@ -54,4 +50,4 @@ metrics:
 
     # optional filters, must return a value, otherwise the resource is filtered
     filters:
-      - "{.metadata.annotations.expiry}"
+      - .metadata.annotations.expiry
