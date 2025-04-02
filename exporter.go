@@ -21,7 +21,19 @@ type (
 func (m *MetricsCollectorKubeResources) Setup(collector *collector.Collector) {
 	m.Processor.Setup(collector)
 
-	baseLabels := []string{"gvk", "name", "namespace"}
+	baseLabels := []string{}
+
+	if Opts.Metrics.Labels.Gvr != "" {
+		baseLabels = append(baseLabels, Opts.Metrics.Labels.Gvr)
+	}
+
+	if Opts.Metrics.Labels.Namespace != "" {
+		baseLabels = append(baseLabels, Opts.Metrics.Labels.Namespace)
+	}
+
+	if Opts.Metrics.Labels.Name != "" {
+		baseLabels = append(baseLabels, Opts.Metrics.Labels.Name)
+	}
 
 	m.prometheus.metric = map[string]*prometheus.GaugeVec{}
 
@@ -84,20 +96,27 @@ func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
 			}
 
 			var metricValue *float64
-
 			if metricConfig.Metric.Value.Value != nil {
 				metricValue = metricConfig.Metric.Value.Value
 			}
 
-			metricLabels := map[string]string{
-				"gvk": fmt.Sprintf(
+			metricLabels := map[string]string{}
+
+			if Opts.Metrics.Labels.Gvr != "" {
+				metricLabels[Opts.Metrics.Labels.Gvr] = fmt.Sprintf(
 					"%s/%s/%s",
 					resource.GetObjectKind().GroupVersionKind().Group,
 					resource.GetObjectKind().GroupVersionKind().Version,
 					resource.GetObjectKind().GroupVersionKind().Kind,
-				),
-				"name":      resource.GetName(),
-				"namespace": resource.GetNamespace(),
+				)
+			}
+
+			if Opts.Metrics.Labels.Namespace != "" {
+				metricLabels[Opts.Metrics.Labels.Namespace] = resource.GetNamespace()
+			}
+
+			if Opts.Metrics.Labels.Name != "" {
+				metricLabels[Opts.Metrics.Labels.Name] = resource.GetName()
 			}
 
 			// find value

@@ -19,6 +19,14 @@ type (
 			Config string `long:"kubeconfig" env:"KUBECONFIG"                                                 description:"Kuberentes config path (should be empty if in-cluster)"`
 		}
 
+		Metrics struct {
+			Labels struct {
+				Name      string `long:"metric.label.name"          env:"METRIC_LABEL_NAME"      description:"Label for resource name"                 default:"name"`
+				Namespace string `long:"metric.label.namespace"     env:"METRIC_LABEL_NAMESPACE" description:"Label for resource namespace"            default:"namespace"`
+				Gvr       string `long:"metric.label.gvr"           env:"METRIC_LABEL_GVR"       description:"Label for resource GroupVersionResource" default:"gvr"`
+			}
+		}
+
 		Scrape struct {
 			Time time.Duration `long:"scrape.time"     env:"SCRAPE_TIME"    description:"Scrape time" default:"30m"`
 		}

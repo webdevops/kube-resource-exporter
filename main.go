@@ -137,7 +137,7 @@ func initMetricCollector() {
 	c.SetScapeTime(Opts.Scrape.Time)
 	c.SetCache(
 		Opts.GetCachePath(collectorName+".json"),
-		collector.BuildCacheTag(cacheTag, Opts.Config, exporterConfig),
+		collector.BuildCacheTag(cacheTag, Opts.Metrics, exporterConfig),
 	)
 	if err := c.Start(); err != nil {
 		logger.Fatal(err.Error())

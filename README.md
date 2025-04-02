@@ -19,20 +19,23 @@ Usage:
   kube-resource-exporter [OPTIONS]
 
 Application Options:
-      --log.debug             debug mode [$LOG_DEBUG]
-      --log.devel             development mode [$LOG_DEVEL]
-      --log.json              Switch log output to json format [$LOG_JSON]
-      --kubeconfig=           Kuberentes config path (should be empty if in-cluster) [$KUBECONFIG]
-      --scrape.time=          Scrape time (default: 30m) [$SCRAPE_TIME]
-      --config=               Path to config file [$CONFIG]
-      --cache.path=           Cache path (to folder, file://path... or azblob://storageaccount.blob.core.windows.net/containername or k8scm://{namespace}/{configmap}})
-                              [$CACHE_PATH]
-      --server.bind=          Server address (default: :8080) [$SERVER_BIND]
-      --server.timeout.read=  Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
-      --server.timeout.write= Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
+      --log.debug               debug mode [$LOG_DEBUG]
+      --log.devel               development mode [$LOG_DEVEL]
+      --log.json                Switch log output to json format [$LOG_JSON]
+      --kubeconfig=             Kuberentes config path (should be empty if in-cluster) [$KUBECONFIG]
+      --metric.label.name=      Label for resource name (default: name) [$METRIC_LABEL_NAME]
+      --metric.label.namespace= Label for resource namespace (default: namespace) [$METRIC_LABEL_NAMESPACE]
+      --metric.label.gvr=       Label for resource GroupVersionResource (default: gvr) [$METRIC_LABEL_GVR]
+      --scrape.time=            Scrape time (default: 30m) [$SCRAPE_TIME]
+      --config=                 Path to config file [$CONFIG]
+      --cache.path=             Cache path (to folder, file://path... or azblob://storageaccount.blob.core.windows.net/containername or k8scm://{namespace}/{configmap}})
+                                [$CACHE_PATH]
+      --server.bind=            Server address (default: :8080) [$SERVER_BIND]
+      --server.timeout.read=    Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
+      --server.timeout.write=   Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
 
 Help Options:
-  -h, --help                  Show this help message
+  -h, --help                    Show this help message
 ```
 
 ### Config
