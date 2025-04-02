@@ -150,10 +150,6 @@ func (m *ConfigMetrics) KubeMetaListOptions() metav1.ListOptions {
 	return opts
 }
 
-func (m *ConfigMetrics) LabelSelectorString() string {
-	return metav1.FormatLabelSelector(m.Selector)
-}
-
 func (m *MetricPathConfig) JsonPath() (*jsonpath.JSONPath, error) {
 	return m._path, nil
 }
