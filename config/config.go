@@ -219,7 +219,6 @@ func (m *MetricPathConfig) ParseValue(val interface{}) (ret *float64) {
 		}
 	}
 
-	fmt.Println(val)
 	switch *m.Type {
 	case TYPE_TIMESTAMP:
 		switch v := val.(type) {
