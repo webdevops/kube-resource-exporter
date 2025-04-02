@@ -120,12 +120,7 @@ func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
 			}
 
 			// find value
-			if metricConfig.Metric.Value.MetricPathConfig != nil && metricConfig.Metric.Value.Path != "" {
-				valuePath, err := metricConfig.Metric.Value.JsonPath()
-				if err != nil {
-					resourceLogger.Error(err)
-				}
-
+			if valuePath := metricConfig.Metric.Value.JsonPath(); valuePath != nil {
 				if results, err := valuePath.FindResults(resource.Object); err == nil {
 					if len(results) == 1 && len(results[0]) == 1 {
 						val := results[0][0].Interface()
@@ -143,13 +138,7 @@ func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
 			for labelName, labelConfig := range metricConfig.Metric.Labels {
 				metricLabels[labelName] = labelConfig.Value
 
-				if labelConfig.MetricPathConfig != nil && labelConfig.Path != "" {
-					labelPath, err := labelConfig.JsonPath()
-
-					if err != nil {
-						resourceLogger.Error(err)
-					}
-
+				if labelPath := labelConfig.JsonPath(); labelPath != nil {
 					if results, err := labelPath.FindResults(resource.Object); err == nil {
 						if len(results) == 1 && len(results[0]) == 1 {
 							val := results[0][0].Interface()

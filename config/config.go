@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,9 +14,6 @@ import (
 )
 
 const (
-	TYPE_TIMESTAMP = "timestamp"
-	TYPE_DATETIME  = "datetime"
-
 	KUBE_SELECTOR_ERROR = "<error>"
 	KUBE_SELECTOR_NONE  = "<none>"
 )
@@ -55,9 +51,9 @@ type (
 	}
 
 	MetricPathConfig struct {
-		Path  string `yaml:"jsonPath" json:"jsonPath"`
-		_path *jsonpath.JSONPath
-		Type  *string `yaml:"type"`
+		Path    string `yaml:"jsonPath" json:"jsonPath"`
+		_path   *jsonpath.JSONPath
+		Convert []*string `yaml:"convert"`
 	}
 
 	MetricFilterConfig struct {
@@ -174,8 +170,12 @@ func (m *ConfigMetrics) KubeMetaListOptions() metav1.ListOptions {
 	return opts
 }
 
-func (m *MetricPathConfig) JsonPath() (*jsonpath.JSONPath, error) {
-	return m._path, nil
+func (m *MetricPathConfig) JsonPath() *jsonpath.JSONPath {
+	if m == nil {
+		return nil
+	}
+
+	return m._path
 }
 
 func (m *MetricPathConfig) ParseLabel(val interface{}) (ret string) {
@@ -189,90 +189,21 @@ func (m *MetricPathConfig) ParseLabel(val interface{}) (ret string) {
 		ret = v
 	}
 
-	// parse/convert value
-	if m.Type != nil {
-		switch *m.Type {
-		case TYPE_TIMESTAMP:
-			// check if unixtimestamp
-			if _, err := strconv.ParseFloat(ret, 64); err == nil {
-				// already timestamp, keep it
-				break
-			}
-
-			for _, timeFormat := range timeFormats {
-				if parseVal, parseErr := time.Parse(timeFormat, ret); parseErr == nil && parseVal.Unix() > 0 {
-					ret = fmt.Sprintf("%d", parseVal.Unix())
-					break
-				}
-			}
-		case TYPE_DATETIME:
-			// check if unixtimestamp
-			if timestamp, err := strconv.ParseFloat(ret, 64); err == nil {
-				ret = time.Unix(int64(timestamp), 0).Format(time.RFC3339)
-				break
-			}
-
-			for _, timeFormat := range timeFormats {
-				if parseVal, parseErr := time.Parse(timeFormat, ret); parseErr == nil && parseVal.Unix() > 0 {
-					ret = parseVal.Format(time.RFC3339)
-
-					break
-				}
-			}
-		default:
-			panic(fmt.Errorf(`label type "%s" not supported`, *m.Type))
-		}
-	}
-
-	return
+	return m.DoConvertLabel(ret)
 }
 
 func (m *MetricPathConfig) ParseValue(val interface{}) (ret *float64) {
-	if m.Type == nil {
-		switch v := val.(type) {
-		case int64:
-			val := float64(v)
-			ret = &val
-		case float64:
-			ret = &v
-		case string:
-			if timestamp, err := strconv.ParseFloat(v, 64); err == nil {
-				ret = &timestamp
-				break
-			}
-		}
+	valueString := ""
+	switch v := val.(type) {
+	case float64:
+		valueString = fmt.Sprintf("%f", v)
+	case int64:
+		valueString = fmt.Sprintf("%d", v)
+	case string:
+		valueString = v
 	}
 
-	switch *m.Type {
-	case TYPE_TIMESTAMP:
-		switch v := val.(type) {
-		case int64:
-			val := float64(v)
-			ret = &val
-		case float64:
-			ret = &v
-		case string:
-			// check if string is timestamp
-			if timestamp, err := strconv.ParseFloat(v, 64); err == nil {
-				ret = &timestamp
-				break
-			}
-
-			// check date formats
-			for _, timeFormat := range timeFormats {
-				if parseVal, parseErr := time.Parse(timeFormat, v); parseErr == nil && parseVal.Unix() > 0 {
-					val := float64(parseVal.Unix())
-					ret = &val
-					break
-				}
-			}
-
-		}
-	default:
-		panic(fmt.Errorf(`value type "%s" not supported`, *m.Type))
-	}
-
-	return
+	return m.DoConvertValue(valueString)
 }
 
 func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {

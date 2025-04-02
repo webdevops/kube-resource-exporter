@@ -8,15 +8,15 @@ metrics:
       # metric value config
       # if no value is found, metric will not be exported
       value:
-        # default or static value
+        # default or static value, optional
         value: 1
 
         # jsonPath for value extraction, must return only one value!
         jsonPath: .metadata.annotations.expiry
 
         # value conversion:
-        #   timestamp = try to parse value as datetime and convert to unix timestamp
-        type: timestamp
+        #   timestamp: try to parse value as datetime and convert to unix timestamp
+        convert: [toTimestamp]
 
       # metric labels
       labels:
@@ -32,12 +32,22 @@ metrics:
         # plain value with timestamp conversion (value will be a unix timestamp as string)
         resourceVersionTS:
           jsonPath: .metadata.resourceVersion
-          type: timestamp
+          # value conversions
+          #   toTimestamp: try to parse value as datetime and convert to unix timestamp
+          #   toDateTime: try to parse value as datetime and convert to RFC3399 date
+          #   toLower: lowercase value
+          #   toUpper: uppercase value
+          #   trim: trim whitespaces
+          convert: [toTimestamp]
 
         # plain value with timestamp conversion (value will be a RFC3399 timestamp as string)
         resourceVersionDT:
           jsonPath: .metadata.resourceVersion
-          type: datetime
+          convert: [toDateTime]
+
+        managedBy:
+          jsonPath: .metadata.labels.app\.kubernetes\.io\/managed-by
+          convert: [ toLower ]
 
     # Kubernetes resource as GroupVersionResource
     resource:
