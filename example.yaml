@@ -51,3 +51,5 @@ metrics:
     # optional filters, must return a value, otherwise the resource is filtered
     filters:
       - jsonPath: .metadata.annotations.expiry
+        # filter value by regex, optional
+        regex: ^([0-9]{4}-[0-9]{2}-[0-9]{2}.*|[0-9]+)$

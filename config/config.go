@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -62,6 +63,9 @@ type (
 	MetricFilterConfig struct {
 		Path  string `yaml:"jsonPath" json:"jsonPath"`
 		_path *jsonpath.JSONPath
+
+		Regex  string `yaml:"regex"`
+		_regex *regexp.Regexp
 	}
 
 	MetricJsonPath string
@@ -128,10 +132,21 @@ func (m *ConfigMetrics) Compile() error {
 			return fmt.Errorf(`jsonPath must be set for filters`)
 		}
 
+		// compile jsonPath
 		if path, err := compileJsonPath(filterConfig.Path); err == nil {
 			filterConfig._path = path
 		} else {
 			return err
+		}
+
+		// compile regex
+		if filterConfig.Regex != "" {
+			filterRegex, err := regexp.Compile(filterConfig.Regex)
+			if err != nil {
+				return err
+			}
+
+			filterConfig._regex = filterRegex
 		}
 	}
 
@@ -279,6 +294,13 @@ func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {
 				value := fmt.Sprintf("%v", val)
 				if value == "" {
 					return false
+				}
+
+				// check regexp
+				if filterConfig._regex != nil {
+					if !filterConfig._regex.MatchString(value) {
+						return false
+					}
 				}
 			} else {
 				return false
