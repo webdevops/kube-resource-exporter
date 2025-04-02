@@ -50,4 +50,4 @@ metrics:
 
     # optional filters, must return a value, otherwise the resource is filtered
     filters:
-      - .metadata.annotations.expiry
+      - jsonPath: .metadata.annotations.expiry

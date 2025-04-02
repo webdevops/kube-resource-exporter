@@ -33,8 +33,7 @@ type (
 		Selector  *metav1.LabelSelector `yaml:"selector"`
 		_selector string
 
-		Filters  []string `yaml:"filters"`
-		_filters []*jsonpath.JSONPath
+		Filters []*MetricFilterConfig `yaml:"filters"`
 	}
 
 	MetricConfig struct {
@@ -58,6 +57,11 @@ type (
 		Path  string `yaml:"jsonPath" json:"jsonPath"`
 		_path *jsonpath.JSONPath
 		Type  *string `yaml:"type"`
+	}
+
+	MetricFilterConfig struct {
+		Path  string `yaml:"jsonPath" json:"jsonPath"`
+		_path *jsonpath.JSONPath
 	}
 
 	MetricJsonPath string
@@ -119,9 +123,13 @@ func (m *ConfigMetrics) Compile() error {
 	}
 
 	// filters
-	for _, path := range m.Filters {
-		if path, err := compileJsonPath(path); err == nil {
-			m._filters = append(m._filters, path)
+	for _, filterConfig := range m.Filters {
+		if filterConfig.Path == "" {
+			return fmt.Errorf(`jsonPath must be set for filters`)
+		}
+
+		if path, err := compileJsonPath(filterConfig.Path); err == nil {
+			filterConfig._path = path
 		} else {
 			return err
 		}
@@ -258,8 +266,8 @@ func (m *ConfigMetrics) IsValidObject(object unstructured.Unstructured) bool {
 		return true
 	}
 
-	for _, filter := range m._filters {
-		if results, err := filter.FindResults(object.Object); err == nil {
+	for _, filterConfig := range m.Filters {
+		if results, err := filterConfig._path.FindResults(object.Object); err == nil {
 			if len(results) == 1 && len(results[0]) == 1 {
 				val := results[0][0].Interface()
 				if val == nil {
