@@ -16,7 +16,7 @@ type (
 
 		// kubernetes settings
 		Kubernetes struct {
-			Config string `long:"kubeconfig" env:"KUBECONFIG"                                                 description:"Kuberentes config path (should be empty if in-cluster)"`
+			Config string `long:"kubeconfig"            env:"KUBECONFIG"               description:"Kuberentes config path (should be empty if in-cluster)"`
 		}
 
 		Metrics struct {
@@ -25,6 +25,9 @@ type (
 				Namespace string `long:"metric.label.namespace"     env:"METRIC_LABEL_NAMESPACE" description:"Label for resource namespace"            default:"namespace"`
 				Gvr       string `long:"metric.label.gvr"           env:"METRIC_LABEL_GVR"       description:"Label for resource GroupVersionResource" default:"gvr"`
 			}
+
+			ListLimit       *int64 `long:"metric.list.limit"  env:"METRIC_LIST_LIMIT"    description:"Result limit for list calls to reduce server stress (paging)"`
+			ListParallelism int    `long:"metric.parallelism"  env:"METRIC_PARALLELISM"   description:"Defines how many metrics should be processed at the same time" default:"5"`
 		}
 
 		Scrape struct {

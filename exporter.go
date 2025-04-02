@@ -4,8 +4,11 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/remeh/sizedwaitgroup"
 	"github.com/webdevops/go-common/prometheus/collector"
 	"go.uber.org/zap"
+
+	"github.com/webdevops/kube-resource-exporter/config"
 )
 
 type (
@@ -66,24 +69,42 @@ func (m *MetricsCollectorKubeResources) Setup(collector *collector.Collector) {
 func (m *MetricsCollectorKubeResources) Reset() {}
 
 func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
+	wg := sizedwaitgroup.New(Opts.Metrics.ListParallelism)
 
 	for _, metricConfig := range exporterConfig.Metrics {
-		metricName := metricConfig.Metric.Name
+		wg.Add()
+		go func() {
+			defer wg.Done()
+			contextLogger := logger.With(
+				zap.String("metric", metricConfig.Metric.Name),
+			)
 
-		contextLogger := logger.With(
-			zap.String("metric", metricName),
-		)
+			m.collectMetric(metricConfig, contextLogger, callback)
+		}()
+	}
 
-		metric := m.Collector.GetMetricList(metricName)
+	wg.Wait()
+}
 
-		resources, err := k8sDyanmicClient.Resource(metricConfig.Resource).List(m.Context(), metricConfig.KubeMetaListOptions())
+func (m *MetricsCollectorKubeResources) collectMetric(metricConfig *config.ConfigMetrics, logger *zap.SugaredLogger, callback chan<- func()) {
+	metric := m.Collector.GetMetricList(metricConfig.Metric.Name)
+
+	listOpts := metricConfig.KubeMetaListOptions()
+
+	if Opts.Metrics.ListLimit != nil {
+		listOpts.Limit = *Opts.Metrics.ListLimit
+	}
+
+	for {
+		result, err := k8sDyanmicClient.Resource(metricConfig.Resource).List(m.Context(), listOpts)
 		if err != nil {
-			contextLogger.Error(err)
+			logger.Error(err)
 			continue
 		}
+		listOpts.Continue = result.GetContinue()
 
-		for _, resource := range resources.Items {
-			resourceLogger := contextLogger.With(
+		for _, resource := range result.Items {
+			resourceLogger := logger.With(
 				zap.String(
 					"resource",
 					fmt.Sprintf("%s/%s", resource.GetNamespace(), resource.GetName()),
@@ -157,6 +178,11 @@ func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
 			} else {
 				resourceLogger.Debug("no value found")
 			}
+		}
+
+		// check if we have more elements
+		if listOpts.Continue == "" {
+			break
 		}
 	}
 }
