@@ -1,0 +1,59 @@
+metrics:
+  - metric:
+      # metric name
+      name: kube_secret_expiry
+      # metric help description
+      help: Secret Expiry
+
+      # metric value config
+      # if no value is found, metric will not be exported
+      value:
+        # default or static value
+        value: 1
+
+        # jsonPath for value extraction, must return only one value!
+        jsonPath: |-
+          {.metadata.annotations.expiry}
+
+        # value conversion:
+        #   timestamp = try to parse value as datetime and convert to unix timestamp
+        type: timestamp
+
+      # metric labels
+      labels:
+
+        # static label foo="bar"
+        foo:
+          value: bar
+
+        # plain value using jsonPath
+        resourceVersion:
+          jsonPath: |-
+            {$.metadata.resourceVersion}
+
+        # plain value with timestamp conversion (value will be a unix timestamp as string)
+        resourceVersionTS:
+          jsonPath: |-
+            {$.metadata.resourceVersion}
+          type: timestamp
+
+        # plain value with timestamp conversion (value will be a RFC3399 timestamp as string)
+        resourceVersionDT:
+          jsonPath: |-
+            {$.metadata.resourceVersion}
+          type: datetime
+
+    # Kubernetes resource as GroupVersionResource
+    resource:
+      group: ""
+      version: v1
+      resource: secrets
+
+    # optional selector, if empty all resources will be processed
+    selector:
+      matchLabels:
+        app.kubernetes.io/managed-by: Helm
+
+    # optional filters, must return a value, otherwise the resource is filtered
+    filters:
+      - "{.metadata.annotations.expiry}"

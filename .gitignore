@@ -1,0 +1,4 @@
+/vendor/
+/kube-resource-exporter*
+/release-assets
+/.vscode
