@@ -159,17 +159,37 @@ func (m *MetricPathConfig) ParseLabel(val interface{}) (ret string) {
 
 func (m *MetricPathConfig) ParseValue(val interface{}) (ret *float64) {
 	if m.Type == nil {
-		if v, ok := val.(float64); ok {
-			return &v
-		}
-	}
-
-	switch *m.Type {
-	case TYPE_TIMESTAMP:
 		switch v := val.(type) {
+		case int64:
+			val := float64(v)
+			ret = &val
 		case float64:
 			ret = &v
 		case string:
+			if timestamp, err := strconv.ParseFloat(v, 64); err == nil {
+				ret = &timestamp
+				break
+			}
+		}
+	}
+
+	fmt.Println(val)
+	switch *m.Type {
+	case TYPE_TIMESTAMP:
+		switch v := val.(type) {
+		case int64:
+			val := float64(v)
+			ret = &val
+		case float64:
+			ret = &v
+		case string:
+			// check if string is timestamp
+			if timestamp, err := strconv.ParseFloat(v, 64); err == nil {
+				ret = &timestamp
+				break
+			}
+
+			// check date formats
 			for _, timeFormat := range timeFormats {
 				if parseVal, parseErr := time.Parse(timeFormat, v); parseErr == nil && parseVal.Unix() > 0 {
 					val := float64(parseVal.Unix())
@@ -177,6 +197,7 @@ func (m *MetricPathConfig) ParseValue(val interface{}) (ret *float64) {
 					break
 				}
 			}
+
 		}
 	default:
 		panic(fmt.Errorf(`value type "%s" not supported`, *m.Type))
