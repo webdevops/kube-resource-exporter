@@ -187,6 +187,12 @@ func (m *MetricPathConfig) ParseLabel(val interface{}) (ret string) {
 		ret = fmt.Sprintf("%d", v)
 	case string:
 		ret = v
+	case bool:
+		if v {
+			ret = "true"
+		} else {
+			ret = "false"
+		}
 	}
 
 	return m.DoConvertLabel(ret)
@@ -201,6 +207,12 @@ func (m *MetricPathConfig) ParseValue(val interface{}) (ret *float64) {
 		valueString = fmt.Sprintf("%d", v)
 	case string:
 		valueString = v
+	case bool:
+		if v {
+			valueString = "1"
+		} else {
+			valueString = "0"
+		}
 	}
 
 	return m.DoConvertValue(valueString)
