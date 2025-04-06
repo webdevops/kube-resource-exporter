@@ -7,6 +7,7 @@ import (
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/webdevops/go-common/prometheus/collector"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/webdevops/kube-resource-exporter/config"
 )
@@ -40,29 +41,28 @@ func (m *MetricsCollectorKubeResources) Setup(collector *collector.Collector) {
 
 	m.prometheus.metric = map[string]*prometheus.GaugeVec{}
 
-	for _, row := range exporterConfig.Metrics {
-		row.KubeMetaListOptions()
-	}
+	// generate metric gauges
+	for _, resourceConfig := range exporterConfig.Resources {
+		for _, metricConfig := range resourceConfig.Metrics {
+			metricName := metricConfig.Name
+			metricLabels := []string{}
+			for labelName := range metricConfig.Labels {
+				metricLabels = append(metricLabels, labelName)
+			}
 
-	for _, metricConfig := range exporterConfig.Metrics {
-		metricName := metricConfig.Metric.Name
-		metricLabels := []string{}
-		for labelName := range metricConfig.Metric.Labels {
-			metricLabels = append(metricLabels, labelName)
+			gaugeVec := prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: metricName,
+					Help: metricConfig.Help,
+				},
+				append(
+					baseLabels,
+					metricLabels...,
+				),
+			)
+			m.Collector.RegisterMetricList(metricName, gaugeVec, true)
+			m.prometheus.metric[metricName] = gaugeVec
 		}
-
-		gaugeVec := prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: metricName,
-				Help: metricConfig.Metric.Help,
-			},
-			append(
-				baseLabels,
-				metricLabels...,
-			),
-		)
-		m.Collector.RegisterMetricList(metricName, gaugeVec, true)
-		m.prometheus.metric[metricName] = gaugeVec
 	}
 }
 
@@ -71,32 +71,30 @@ func (m *MetricsCollectorKubeResources) Reset() {}
 func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
 	wg := sizedwaitgroup.New(Opts.Metrics.ListParallelism)
 
-	for _, metricConfig := range exporterConfig.Metrics {
+	for _, resourceConfig := range exporterConfig.Resources {
 		wg.Add()
 		go func() {
 			defer wg.Done()
 			contextLogger := logger.With(
-				zap.String("metric", metricConfig.Metric.Name),
+				zap.String("gvr", fmt.Sprintf("%s/%s/%s", resourceConfig.Group, resourceConfig.Version, resourceConfig.Resource)),
 			)
 
-			m.collectMetric(metricConfig, contextLogger, callback)
+			m.collectResource(resourceConfig, contextLogger, callback)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func (m *MetricsCollectorKubeResources) collectMetric(metricConfig *config.ConfigMetrics, logger *zap.SugaredLogger, callback chan<- func()) {
-	metric := m.Collector.GetMetricList(metricConfig.Metric.Name)
-
-	listOpts := metricConfig.KubeMetaListOptions()
+func (m *MetricsCollectorKubeResources) collectResource(resourceConfig *config.ConfigResource, logger *zap.SugaredLogger, callback chan<- func()) {
+	listOpts := resourceConfig.KubeMetaListOptions()
 
 	if Opts.Metrics.ListLimit != nil {
 		listOpts.Limit = *Opts.Metrics.ListLimit
 	}
 
 	for {
-		result, err := k8sDyanmicClient.Resource(metricConfig.Resource).List(m.Context(), listOpts)
+		result, err := k8sDyanmicClient.Resource(*resourceConfig.GroupVersionResource).List(m.Context(), listOpts)
 		if err != nil {
 			logger.Error(err)
 			continue
@@ -104,79 +102,13 @@ func (m *MetricsCollectorKubeResources) collectMetric(metricConfig *config.Confi
 		listOpts.Continue = result.GetContinue()
 
 		for _, resource := range result.Items {
-			resourceLogger := logger.With(
-				zap.String(
-					"resource",
-					fmt.Sprintf("%s/%s", resource.GetNamespace(), resource.GetName()),
-				),
-			)
-
-			if !metricConfig.IsValidObject(resource) {
-				resourceLogger.Debug("filtered")
-				continue
-			}
-
-			var metricValue *float64
-			if metricConfig.Metric.Value.Value != nil {
-				metricValue = metricConfig.Metric.Value.Value
-			}
-
-			metricLabels := map[string]string{}
-
-			if Opts.Metrics.Labels.Gvr != "" {
-				metricLabels[Opts.Metrics.Labels.Gvr] = fmt.Sprintf(
-					"%s/%s/%s",
-					resource.GetObjectKind().GroupVersionKind().Group,
-					resource.GetObjectKind().GroupVersionKind().Version,
-					resource.GetObjectKind().GroupVersionKind().Kind,
+			for _, metricConfig := range resourceConfig.Metrics {
+				metricLogger := logger.With(
+					zap.String("resource", fmt.Sprintf("%s/%s", resource.GetNamespace(), resource.GetName())),
+					zap.String("metric", metricConfig.Name),
 				)
-			}
 
-			if Opts.Metrics.Labels.Namespace != "" {
-				metricLabels[Opts.Metrics.Labels.Namespace] = resource.GetNamespace()
-			}
-
-			if Opts.Metrics.Labels.Name != "" {
-				metricLabels[Opts.Metrics.Labels.Name] = resource.GetName()
-			}
-
-			// find value
-			if valuePath := metricConfig.Metric.Value.JsonPath(); valuePath != nil {
-				if results, err := valuePath.FindResults(resource.Object); err == nil {
-					if len(results) == 1 && len(results[0]) == 1 {
-						val := results[0][0].Interface()
-
-						if v := metricConfig.Metric.Value.ParseValue(val); v != nil {
-							metricValue = v
-						}
-					}
-				} else {
-					resourceLogger.Error(err)
-				}
-			}
-
-			// find labels
-			for labelName, labelConfig := range metricConfig.Metric.Labels {
-				metricLabels[labelName] = labelConfig.Value
-
-				if labelPath := labelConfig.JsonPath(); labelPath != nil {
-					if results, err := labelPath.FindResults(resource.Object); err == nil {
-						if len(results) == 1 && len(results[0]) == 1 {
-							val := results[0][0].Interface()
-
-							metricLabels[labelName] = labelConfig.ParseLabel(val)
-						}
-					} else {
-						resourceLogger.Error(err)
-					}
-				}
-			}
-
-			// process metric
-			if metricValue != nil {
-				metric.Add(metricLabels, *metricValue)
-			} else {
-				resourceLogger.Debug("no value found")
+				m.collectResourceMetric(resourceConfig, metricConfig, resource, metricLogger, callback)
 			}
 		}
 
@@ -184,5 +116,79 @@ func (m *MetricsCollectorKubeResources) collectMetric(metricConfig *config.Confi
 		if listOpts.Continue == "" {
 			break
 		}
+	}
+}
+
+func (m *MetricsCollectorKubeResources) collectResourceMetric(resourceConfig *config.ConfigResource, metricConfig *config.ConfigMetric, resource unstructured.Unstructured, logger *zap.SugaredLogger, callback chan<- func()) {
+	metric := m.Collector.GetMetricList(metricConfig.Name)
+
+	if !metricConfig.IsValidObject(resource) {
+		logger.Debug("filtered")
+		return
+	}
+
+	var metricValue *float64
+	if metricConfig.Value.Value != nil {
+		metricValue = metricConfig.Value.Value
+	}
+
+	metricLabels := map[string]string{}
+
+	if Opts.Metrics.Labels.Gvr != "" {
+		metricLabels[Opts.Metrics.Labels.Gvr] = fmt.Sprintf(
+			"%s/%s/%s",
+			resource.GetObjectKind().GroupVersionKind().Group,
+			resource.GetObjectKind().GroupVersionKind().Version,
+			resource.GetObjectKind().GroupVersionKind().Kind,
+		)
+	}
+
+	if Opts.Metrics.Labels.Namespace != "" {
+		metricLabels[Opts.Metrics.Labels.Namespace] = resource.GetNamespace()
+	}
+
+	if Opts.Metrics.Labels.Name != "" {
+		metricLabels[Opts.Metrics.Labels.Name] = resource.GetName()
+	}
+
+	// find value
+	if valuePath := metricConfig.Value.JsonPath(); valuePath != nil {
+		if results, err := valuePath.FindResults(resource.Object); err == nil {
+			if len(results) == 1 && len(results[0]) == 1 {
+				val := results[0][0].Interface()
+
+				if v := metricConfig.Value.ParseValue(val); v != nil {
+					metricValue = v
+				}
+			}
+		} else {
+			logger.Error(err)
+			return
+		}
+	}
+
+	// find labels
+	for labelName, labelConfig := range metricConfig.Labels {
+		metricLabels[labelName] = labelConfig.Value
+
+		if labelPath := labelConfig.JsonPath(); labelPath != nil {
+			if results, err := labelPath.FindResults(resource.Object); err == nil {
+				if len(results) == 1 && len(results[0]) == 1 {
+					val := results[0][0].Interface()
+
+					metricLabels[labelName] = labelConfig.ParseLabel(val)
+				}
+			} else {
+				logger.Error(err)
+				return
+			}
+		}
+	}
+
+	// process metric
+	if metricValue != nil {
+		metric.Add(metricLabels, *metricValue)
+	} else {
+		logger.Debug("no value found")
 	}
 }

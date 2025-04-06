@@ -15,7 +15,7 @@ const (
 	CONVERT_TRIM        = "trim"
 )
 
-func (m *MetricPathConfig) DoConvertValue(v string) (ret *float64) {
+func (m *ConfigMetricJsonPath) DoConvertValue(v string) (ret *float64) {
 	if val, err := strconv.ParseFloat(v, 64); err == nil {
 		ret = &val
 	}
@@ -50,7 +50,7 @@ convertLoop:
 	return
 }
 
-func (m *MetricPathConfig) DoConvertLabel(val string) (ret string) {
+func (m *ConfigMetricJsonPath) DoConvertLabel(val string) (ret string) {
 	ret = val
 
 convertLoop:

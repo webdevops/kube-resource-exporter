@@ -1,65 +1,64 @@
-metrics:
-  - metric:
-      # metric name
-      name: kube_secret_expiry
-      # metric help description
-      help: Secret Expiry
-
-      # metric value config
-      # if no value is found, metric will not be exported
-      value:
-        # default or static value, optional
-        value: 1
-
-        # jsonPath for value extraction, must return only one value!
-        jsonPath: .metadata.annotations.expiry
-
-        # value conversion:
-        #   timestamp: try to parse value as datetime and convert to unix timestamp
-        convert: [toTimestamp]
-
-      # metric labels
-      labels:
-
-        # static label foo="bar"
-        foo:
-          value: bar
-
-        # plain value using jsonPath
-        resourceVersion:
-          jsonPath: .metadata.resourceVersion
-
-        # plain value with timestamp conversion (value will be a unix timestamp as string)
-        resourceVersionTS:
-          jsonPath: .metadata.resourceVersion
-          # value conversions
-          #   toTimestamp: try to parse value as datetime and convert to unix timestamp
-          #   toDateTime: try to parse value as datetime and convert to RFC3399 date
-          #   toLower: lowercase value
-          #   toUpper: uppercase value
-          #   trim: trim whitespaces
-          convert: [toTimestamp]
-
-        # plain value with timestamp conversion (value will be a RFC3399 timestamp as string)
-        resourceVersionDT:
-          jsonPath: .metadata.resourceVersion
-          convert: [toDateTime]
-
-        managedBy:
-          jsonPath: .metadata.labels.app\.kubernetes\.io\/managed-by
-          convert: [ toLower ]
-
-    # Kubernetes resource as GroupVersionResource
-    resource:
-      group: ""
-      version: v1
-      resource: secrets
+resources:
+  -
+    group: ""
+    version: v1
+    resource: secrets
 
     # optional selector, if empty all resources will be processed
     selector: {}
 
-    # optional filters, must return a value, otherwise the resource is filtered
-    filters:
-      - jsonPath: .metadata.annotations.expiry
-        # filter value by regex, optional
-        regex: ^([0-9]{4}-[0-9]{2}-[0-9]{2}.*|[0-9]+)$
+    metrics:
+      # metric name
+      - name: kube_secret_expiry
+        # metric help description
+        help: Secret Expiry
+
+        # metric value config
+        # if no value is found, metric will not be exported
+        value:
+          # default or static value, optional
+          value: 1
+
+          # jsonPath for value extraction, must return only one value!
+          jsonPath: .metadata.annotations.expiry
+
+          # value conversion:
+          #   timestamp: try to parse value as datetime and convert to unix timestamp
+          convert: [toTimestamp]
+
+        # metric labels
+        labels:
+
+          # static label foo="bar"
+          foo:
+            value: bar
+
+          # plain value using jsonPath
+          resourceVersion:
+            jsonPath: .metadata.resourceVersion
+
+          # plain value with timestamp conversion (value will be a unix timestamp as string)
+          resourceVersionTS:
+            jsonPath: .metadata.resourceVersion
+            # value conversions
+            #   toTimestamp: try to parse value as datetime and convert to unix timestamp
+            #   toDateTime: try to parse value as datetime and convert to RFC3399 date
+            #   toLower: lowercase value
+            #   toUpper: uppercase value
+            #   trim: trim whitespaces
+            convert: [toTimestamp]
+
+          # plain value with timestamp conversion (value will be a RFC3399 timestamp as string)
+          resourceVersionDT:
+            jsonPath: .metadata.resourceVersion
+            convert: [toDateTime]
+
+          managedBy:
+            jsonPath: .metadata.labels.app\.kubernetes\.io\/managed-by
+            convert: [ toLower ]
+
+        # optional filters, must return a value, otherwise the resource is filtered
+        filters:
+          - jsonPath: .metadata.annotations.expiry
+            # filter value by regex, optional
+            regex: ^([0-9]{4}-[0-9]{2}-[0-9]{2}.*|[0-9]+)$
