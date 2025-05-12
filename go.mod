@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.2
 
 require (
-	github.com/KimMachineGun/automemlimit v0.7.1
+	github.com/KimMachineGun/automemlimit v0.7.2
 	github.com/go-logr/zapr v1.3.0
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/prometheus/client_golang v1.22.0
