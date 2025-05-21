@@ -7,11 +7,10 @@ import (
 	"os"
 	"runtime"
 
+	yaml "github.com/goccy/go-yaml"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/yaml"
 
-	_ "github.com/KimMachineGun/automemlimit"
 	"github.com/go-logr/zapr"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -82,20 +81,18 @@ func initArgparser() {
 }
 
 func initConfig(path string) {
-	var configRaw []byte
-
 	exporterConfig = &config.Config{}
 
 	logger.With(zap.String("path", path)).Infof("reading configuration from file %v", path)
 	/* #nosec */
-	if data, err := os.ReadFile(path); err == nil {
-		configRaw = data
-	} else {
+	data, err := os.ReadFile(path)
+	if err != nil {
 		logger.Fatal(err)
 	}
 
 	logger.With(zap.String("path", path)).Info("parsing configuration")
-	if err := yaml.Unmarshal(configRaw, &exporterConfig); err != nil {
+	err = yaml.UnmarshalWithOptions(data, exporterConfig, yaml.Strict(), yaml.UseJSONUnmarshaler())
+	if err != nil {
 		logger.Fatal(err)
 	}
 

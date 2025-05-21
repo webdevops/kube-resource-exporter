@@ -24,7 +24,7 @@ type (
 	}
 
 	ConfigResource struct {
-		*schema.GroupVersionResource
+		*schema.GroupVersionResource `yaml:",inline"`
 
 		Selector  *metav1.LabelSelector `yaml:"selector"`
 		_selector string
