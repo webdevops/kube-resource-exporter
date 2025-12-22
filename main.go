@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"runtime"
 
 	"github.com/go-logr/logr"
 	yaml "github.com/goccy/go-yaml"
@@ -35,11 +34,6 @@ var (
 
 	k8sDyanmicClient dynamic.Interface
 
-	// Git version information
-	gitCommit = "<unknown>"
-	gitTag    = "<unknown>"
-	buildDate = "<unknown>"
-
 	// cache config
 	cacheTag = "v2"
 
@@ -50,8 +44,7 @@ func main() {
 	initArgparser()
 	initLogger()
 
-	logger.Infof("starting kube-resource-exporter v%s (%s; %s; by %v at %v)", gitTag, gitCommit, runtime.Version(), Author, buildDate)
-	logger.Info(string(Opts.GetJson()))
+	printStartup("kube-resource-exporter", Author)
 
 	initSystem()
 	initConfig(Opts.Config.File)

@@ -10,7 +10,7 @@ require (
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/remeh/sizedwaitgroup v1.0.0
-	github.com/webdevops/go-common v0.0.0-20251219213826-139615203ee5
+	github.com/webdevops/go-common v0.0.0-20251222130718-713f8c390b81
 	go.uber.org/zap v1.27.1
 	k8s.io/apimachinery v0.35.0
 	k8s.io/client-go v0.35.0
