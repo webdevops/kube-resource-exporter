@@ -1,17 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"runtime"
 
+	"github.com/go-logr/logr"
 	yaml "github.com/goccy/go-yaml"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/go-logr/zapr"
 	flags "github.com/jessevdk/go-flags"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/webdevops/go-common/prometheus/collector"
@@ -36,6 +38,7 @@ var (
 	// Git version information
 	gitCommit = "<unknown>"
 	gitTag    = "<unknown>"
+	buildDate = "<unknown>"
 
 	// cache config
 	cacheTag = "v2"
@@ -45,9 +48,9 @@ var (
 
 func main() {
 	initArgparser()
-	defer initLogger().Sync() // nolint:errcheck
+	initLogger()
 
-	logger.Infof("starting kube-resource-exporter v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
+	logger.Infof("starting kube-resource-exporter v%s (%s; %s; by %v at %v)", gitTag, gitCommit, runtime.Version(), Author, buildDate)
 	logger.Info(string(Opts.GetJson()))
 
 	initSystem()
@@ -59,7 +62,7 @@ func main() {
 	logger.Infof("starting metrics collection")
 	initMetricCollector()
 
-	logger.Infof("starting http server on %s", Opts.Server.Bind)
+	logger.Info("starting http server", slog.String("bind", Opts.Server.Bind))
 	startHttpServer()
 }
 
@@ -87,17 +90,17 @@ func initConfig(path string) {
 	/* #nosec */
 	data, err := os.ReadFile(path)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatal(err.Error())
 	}
 
 	logger.With(zap.String("path", path)).Info("parsing configuration")
 	err = yaml.UnmarshalWithOptions(data, exporterConfig, yaml.Strict(), yaml.UseJSONUnmarshaler())
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatal(err.Error())
 	}
 
 	if err := exporterConfig.Compile(); err != nil {
-		logger.Fatal(err)
+		logger.Fatal(err.Error())
 	}
 }
 
@@ -125,17 +128,25 @@ func initKubeConnection() {
 		panic(err)
 	}
 
-	log.SetLogger(zapr.NewLogger(logger.Desugar()))
+	// kube logger
+	logrHandler := logr.NewContextWithSlogLogger(context.Background(), logger.Slog())
+	kubeLogger, err := logr.FromContext(logrHandler)
+	if err != nil {
+		panic(err.Error())
+	}
+	log.SetLogger(kubeLogger)
 }
 
 func initMetricCollector() {
 	collectorName := "kube-resources"
-	c := collector.New(collectorName, &MetricsCollectorKubeResources{}, logger)
+	c := collector.New(collectorName, &MetricsCollectorKubeResources{}, logger.Slog())
 	c.SetScapeTime(Opts.Scrape.Time)
-	c.SetCache(
+	if err := c.SetCache(
 		Opts.GetCachePath(collectorName+".json"),
 		collector.BuildCacheTag(cacheTag, Opts.Metrics, exporterConfig),
-	)
+	); err != nil {
+		panic(err)
+	}
 	if err := c.Start(); err != nil {
 		logger.Fatal(err.Error())
 	}
@@ -148,14 +159,14 @@ func startHttpServer() {
 	// healthz
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 	})
 
 	// readyz
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 	})
 
@@ -167,5 +178,7 @@ func startHttpServer() {
 		ReadTimeout:  Opts.Server.ReadTimeout,
 		WriteTimeout: Opts.Server.WriteTimeout,
 	}
-	logger.Fatal(srv.ListenAndServe())
+	if err := srv.ListenAndServe(); err != nil {
+		logger.Fatal(err.Error())
+	}
 }

@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/webdevops/go-common/prometheus/collector"
-	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/webdevops/kube-resource-exporter/config"
@@ -75,8 +75,8 @@ func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
 		wg.Add()
 		go func() {
 			defer wg.Done()
-			contextLogger := logger.With(
-				zap.String("gvr", fmt.Sprintf("%s/%s/%s", resourceConfig.Group, resourceConfig.Version, resourceConfig.Resource)),
+			contextLogger := m.Logger().With(
+				slog.String("gvr", fmt.Sprintf("%s/%s/%s", resourceConfig.Group, resourceConfig.Version, resourceConfig.Resource)),
 			)
 
 			m.collectResource(resourceConfig, contextLogger, callback)
@@ -86,7 +86,7 @@ func (m *MetricsCollectorKubeResources) Collect(callback chan<- func()) {
 	wg.Wait()
 }
 
-func (m *MetricsCollectorKubeResources) collectResource(resourceConfig *config.ConfigResource, logger *zap.SugaredLogger, callback chan<- func()) {
+func (m *MetricsCollectorKubeResources) collectResource(resourceConfig *config.ConfigResource, logger *slog.Logger, callback chan<- func()) {
 	listOpts := resourceConfig.KubeMetaListOptions()
 
 	if Opts.Metrics.ListLimit != nil {
@@ -96,7 +96,7 @@ func (m *MetricsCollectorKubeResources) collectResource(resourceConfig *config.C
 	for {
 		result, err := k8sDyanmicClient.Resource(*resourceConfig.GroupVersionResource).List(m.Context(), listOpts)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			continue
 		}
 		listOpts.Continue = result.GetContinue()
@@ -104,8 +104,8 @@ func (m *MetricsCollectorKubeResources) collectResource(resourceConfig *config.C
 		for _, resource := range result.Items {
 			for _, metricConfig := range resourceConfig.Metrics {
 				metricLogger := logger.With(
-					zap.String("resource", fmt.Sprintf("%s/%s", resource.GetNamespace(), resource.GetName())),
-					zap.String("metric", metricConfig.Name),
+					slog.String("resource", fmt.Sprintf("%s/%s", resource.GetNamespace(), resource.GetName())),
+					slog.String("metric", metricConfig.Name),
 				)
 
 				m.collectResourceMetric(resourceConfig, metricConfig, resource, metricLogger, callback)
@@ -119,7 +119,7 @@ func (m *MetricsCollectorKubeResources) collectResource(resourceConfig *config.C
 	}
 }
 
-func (m *MetricsCollectorKubeResources) collectResourceMetric(resourceConfig *config.ConfigResource, metricConfig *config.ConfigMetric, resource unstructured.Unstructured, logger *zap.SugaredLogger, callback chan<- func()) {
+func (m *MetricsCollectorKubeResources) collectResourceMetric(resourceConfig *config.ConfigResource, metricConfig *config.ConfigMetric, resource unstructured.Unstructured, logger *slog.Logger, callback chan<- func()) {
 	metric := m.Collector.GetMetricList(metricConfig.Name)
 
 	if !metricConfig.IsValidObject(resource) {
@@ -162,7 +162,7 @@ func (m *MetricsCollectorKubeResources) collectResourceMetric(resourceConfig *co
 				}
 			}
 		} else {
-			logger.Error(err)
+			logger.Error(err.Error())
 			return
 		}
 	}
@@ -179,7 +179,7 @@ func (m *MetricsCollectorKubeResources) collectResourceMetric(resourceConfig *co
 					metricLabels[labelName] = labelConfig.ParseLabel(val)
 				}
 			} else {
-				logger.Error(err)
+				logger.Error(err.Error())
 				return
 			}
 		}
