@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/webdevops/go-common/kubernetes/selector"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,8 +27,7 @@ type (
 	ConfigResource struct {
 		*schema.GroupVersionResource `yaml:",inline"`
 
-		Selector  *metav1.LabelSelector `yaml:"selector"`
-		_selector string
+		Selector *selector.LabelSelector `yaml:"selector"`
 
 		Metrics []*ConfigMetric `yaml:"metrics"`
 	}
@@ -55,6 +55,8 @@ type (
 		Path    string `yaml:"jsonPath" json:"jsonPath"`
 		_path   *jsonpath.JSONPath
 		Convert []*string `yaml:"convert"`
+
+		Template *string `yaml:"template"`
 	}
 
 	ConfigMetricFilter struct {
@@ -112,14 +114,10 @@ func (m *ConfigResource) Compile() error {
 	}
 
 	// selector
-	if m.Selector != nil {
-		selector := metav1.FormatLabelSelector(m.Selector)
-		if strings.EqualFold(selector, KUBE_SELECTOR_ERROR) {
-			return fmt.Errorf(`unable to compile Kubernetes selector for resource "%s/%s/%s"`, m.Group, m.Version, m.Resource)
-		}
-
-		if !strings.EqualFold(selector, KUBE_SELECTOR_NONE) {
-			m._selector = selector
+	if !m.Selector.IsEmpty() {
+		_, err := m.Selector.Compile()
+		if err != nil {
+			return fmt.Errorf(`unable to compile Kubernetes selector for resource "%s/%s/%s": %w`, m.Group, m.Version, m.Resource, err)
 		}
 	}
 
@@ -187,8 +185,13 @@ func (m *ConfigMetric) Compile() error {
 
 func (m *ConfigResource) KubeMetaListOptions() metav1.ListOptions {
 	opts := metav1.ListOptions{}
-	if m._selector != "" {
-		opts.LabelSelector = m._selector
+	if !m.Selector.IsEmpty() {
+		if selector, err := m.Selector.Compile(); err == nil {
+			opts.LabelSelector = selector
+		} else {
+			// should be cached already before
+			panic(err)
+		}
 	}
 
 	return opts

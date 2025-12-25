@@ -1,10 +1,14 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"strconv"
 	"strings"
 	"time"
+
+	sprig "github.com/Masterminds/sprig/v3"
 )
 
 const (
@@ -101,6 +105,21 @@ convertLoop:
 		default:
 			panic(fmt.Errorf(`label value conversion "%s" not supported`, *method))
 		}
+	}
+
+	if m.Template != nil {
+		tmpl, err := template.New("template").Funcs(sprig.FuncMap()).Parse(*m.Template)
+		if err != nil {
+			panic(fmt.Errorf("unable to parse template: %w", err))
+		}
+
+		buf := new(bytes.Buffer)
+		err = tmpl.Execute(buf, ret)
+		if err != nil {
+			panic(fmt.Errorf("unable to execute template: %w", err))
+		}
+
+		ret = buf.String()
 	}
 
 	return

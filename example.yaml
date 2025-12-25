@@ -54,6 +54,12 @@ resources:
             jsonPath: .metadata.resourceVersion
             convert: [toDateTime]
 
+          # plain value with timestamp conversion (value will be parsed using a go template supporting https://masterminds.github.io/sprig/)
+          uidTemplate:
+            jsonPath: .metadata.uid
+            template: |-
+              {{ . | abbrev 5 }}
+
           managedBy:
             jsonPath: .metadata.labels.app\.kubernetes\.io\/managed-by
             convert: [ toLower ]
